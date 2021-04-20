@@ -1,0 +1,156 @@
+<!DOCTYPE html>
+<html lang="en" xmlns="http://www.w3.org/1999/html">
+<head>
+    <meta charset="UTF-8">
+    <title>My Chat App</title>
+</head>
+<style>
+    .sidenav {
+  height: 100%; /* Full-height: remove this if you want "auto" height */
+  width: 160px; /* Set the width of the sidebar */
+  position: fixed; /* Fixed Sidebar (stay in place on scroll) */
+  z-index: 1; /* Stay on top */
+  top: 0; /* Stay at the top */
+  left: 0;
+  overflow-x: hidden; /* Disable horizontal scroll */
+  padding-top: 20px;
+}
+
+/* The navigation menu links */
+.sidenav a {
+  padding: 6px 8px 6px 16px;
+  text-decoration: none;
+  font-size: 25px;
+  display: block;
+}
+
+/* Style page content */
+.main {
+  margin-left: 160px; /* Same as the width of the sidebar */
+  padding: 0px 10px;
+}
+
+/* On smaller screens, where height is less than 450px, change the style of the sidebar (less padding and a smaller font size) */
+@media screen and (max-height: 450px) {
+  .sidenav {padding-top: 15px;}
+  .sidenav a {font-size: 18px;}
+}
+</style>
+<body>
+<!--<div class="sidenav">-->
+<!--    {% for room in rooms %}-->
+<!--        <li>-->
+<!--            <a href="/rooms/{{ room._id.room_id }}">{{ room.room_name }}</a>-->
+<!--&lt;!&ndash;            <a href="/chat_history/{{ room._id.room_id }}">Chat history</a>&ndash;&gt;-->
+<!--        </li>-->
+<!--    {% endfor %}-->
+<!--</div>-->
+<div class="main">
+<h1>Welcome to chat room {{room.name}}</h1>
+    <button id="notify">Allow Notifications</button>
+
+<div id="messages">
+    {% for message in messages %}
+        <div><b>{{ message.sender }}:&nbsp;[{{ message.created_at }}]&nbsp;</b> {{ message.text }} </div>
+    {% endfor %}
+</div>
+<form id="message_input_form">
+    <input type="text" id="message_input" placeholder="Enter your message">
+    <button type="submit">Send</button>
+</form>
+<b><a href="/chat_history/{{room.room_name}}/"> Chat History</a> </b>
+<ul>
+    {% for member in room_members %}
+    <li>{{ member._id.username }}</li>
+    {% endfor %}
+</ul>
+</div>
+</body>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/2.3.0/socket.io.js"></script>
+<script type="text/javascript" charset="utf-8">
+
+// the connection created here is specefic for room and helps to make the chat private between the user
+const socket = io.connect("http://127.0.0.1:5000");
+
+    // when the user comes to this page, join room socket function is called which calls the websocket api
+    // 'join_room' name
+    socket.on('connect', function () {
+        socket.emit('join_room', {
+            username: "{{ username }}",
+            room: "{{ room._id }}"
+    });
+        let message_input = document.getElementById('message_input');
+
+        document.getElementById('message_input_form').onsubmit = function (e) {
+            e.preventDefault();
+            let message = message_input.value.trim();
+
+            // when the submit button is clicked, the message is sent to the webscocket api 'send message'
+            // with the user that sent the message and the room id
+
+            if (message.length) {
+                socket.emit('send_message', {
+                    username: "{{ username }}",
+                    room: "{{ room._id }}",
+                    message: message
+                })
+            }
+            message_input.value = '';
+            message_input.focus();
+        }
+    });
+
+    // receives the response from the websocket api 'notification' and displays the notification
+    // to the current user
+    socket.on('receive_notification', function(data) {
+        if(data.unread_messages !== []) {
+            var n = new Notification("Hi!, got a new notification");
+        }
+    });
+
+    // this function calls the websocket api 'leave_room' if the user clicks the back button or closes the tab
+    // sends the current username and room id to the websocket api
+    window.onbeforeunload = function () {
+        socket.emit('leave_room', {
+            username: "{{ username }}",
+            room: "{{ room._id }}"
+        })
+    };
+
+    // this function receives the response from websocket api 'send message' and displays the
+    // new message to the current user received from the other user
+    socket.on('receive_message', function (data) {
+        const newNode = document.createElement('div');
+        newNode.innerHTML = `<b>${data.username}&nbsp;[${data.created_at}]  :&nbsp;</b> ${data.message}`;
+        document.getElementById('messages').appendChild(newNode);
+    });
+
+    // this function receives the response from 'send_message' websocket api and it then calls
+    // notification websocket api and sends the current username and room id to the api
+    socket.on('send_notification', function (data) {
+        socket.emit('notification', {
+            username: data.receivers[0],
+            room: "{{ room._id }}"
+    });
+    });
+
+    // this function receives the response from 'join_room' websocket api and it then displays that
+    // the other user has joined the chat
+    socket.on('join_room_announcement', function (data) {
+        if (data.username !== "{{ username }}") {
+            const newNode = document.createElement('div');
+            newNode.innerHTML = `<b>${data.username}</b> has joined the chat`;
+            document.getElementById('messages').appendChild(newNode);
+        }
+    });
+
+    // this function receives the response from the 'leave_room' websocket api and ti then displays that the
+    // other user has left thr chat
+    socket.on('leave_room_announcement', function (data) {
+        const newNode = document.createElement('div');
+        newNode.innerHTML = `<b>${data.username}</b> has left the chat`;
+        document.getElementById('messages').appendChild(newNode);
+    });
+</script>
+</html>
