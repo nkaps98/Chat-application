@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Chat app</title>
+</head>
+<body>
+    <b id="sender">{{user_profile_name}}</b>
+    {% if room == "" %}
+    <p>{{ username }}</p>
+    <form id="sed_req_form" method="post" action="/send-request/{{ user_profile_name }}">
+        <button type="submit">Send request</button>
+    </form>
+    {% else %}
+    <a href="/rooms/{{ room }}">Chat</a>
+    {% endif %}
+</body>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/2.3.0/socket.io.js"></script>
+<script>
+
+/*  the connection created here has a namespace 'notifs' which sends the data between client and server to the
+    namespace '/notifs'. The messages sent to namespace are not specefic to any room and hence are used to
+    display information on other pages */
+
+    const sockets = io.connect("http://127.0.0.1:5000/notifs");
+
+    // if the user clicks the Send Request button, this function calls the send_permission websocket api and
+    // sends the current username and the other user's name
+
+    // this function will not get activated on this page as there is no send request button
+
+    if(document.body.contains(document.getElementById('sed_req_form'))){
+            document.getElementById('sed_req_form').onsubmit = function (e) {
+            var text = document.getElementById("sender"). innerHTML;
+                e.preventDefault();
+                    sockets.emit('send_permission', {
+                        username: "{{ username }}",
+                        receive_name: text
+                    })
+                }
+        }
+
+    // this function recieves the response from the send permission websocket api
+    // it checks whether the receiver of this message has the same name as the current user and if yes
+    // the user receives an alert that this he has got request from other user and its puts the new notification
+    // under the notification heading
+
+    sockets.on('receive_permission', function(data){
+        if(document.body.contains(document.getElementById("perm"))){
+
+        }
+    });
+
+    // this function receives the response from the 'notification_outside' websocket api and if the reciever
+    // name is same as the current user, the user gets a notification that some user has sent some message
+
+    sockets.on('receive_notification', function(data) {
+        if(data.unread_messages !== [] && data.receivers=="{{ username }}") {
+            var n = new Notification("Hi!, got a new message from " + data.sender + ": " + data.last_message);
+        }
+    });
+
+    // this function calls the 'notification_websocket' websocket api. It sends the receiver's name and senders
+    // name to the websocket api
+
+    sockets.on('send_notification', function (data) {
+        sockets.emit('notification_outside', {
+            username: data.receivers[0],
+            sender : data.username
+    });
+    });
+</script>
+</html>
